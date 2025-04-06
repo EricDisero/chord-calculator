@@ -78,6 +78,8 @@ h2 {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
 }
 
 h3 {
@@ -153,18 +155,29 @@ button:hover::before {
 
 /* Example progression buttons – plain grey without gradient */
 .example-btn {
-  background-color: #6b7280;
-  background-image: none;
-  color: #ffffff;
+  background: none !important;
+  background-color: #6b7280 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  transform: none;
+  position: relative;
+  overflow: hidden;
   font-size: 0.875rem;
   padding: 8px 12px;
   border: none;
   border-radius: 8px;
-  transition: background 0.3s;
+  cursor: pointer;
+  transition: background-color 0.4s ease, transform 0.4s ease;
+}
+
+.example-btn::before {
+  content: none !important; /* kill shimmer */
 }
 
 .example-btn:hover {
-  background-color: #4b5563;
+  background-color: #4b5563 !important;
+  transform: translateY(-2px);
+  box-shadow: none;
 }
 
 /* Table styles with dark header */
