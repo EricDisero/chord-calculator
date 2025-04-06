@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chord Analyzer</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Chord Analyzer</h1>
+
+    <div class="card">
+      <form id="chord-form">
+        <input type="text" id="chord-input" placeholder="Enter chords separated by commas (e.g., C, G, Am, F)" autofocus>
+        <button type="submit" id="analyze-btn">Analyze Chords</button>
+      </form>
+
+      <div class="examples">
+        <h3>Example progressions:</h3>
+        <div id="example-buttons">
+          <!-- Example buttons will be inserted here -->
+        </div>
+      </div>
+    </div>
+
+    <div id="results" class="card hidden">
+      <div class="key-info">
+        <h2>Detected Key: <span id="detected-key">C Major</span></h2>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Chord</th>
+            <th>Roman Numeral</th>
+            <th>Function</th>
+          </tr>
+        </thead>
+        <tbody id="analysis-body">
+          <!-- Results will be inserted here -->
+        </tbody>
+      </table>
+
+      <div class="explanation">
+        <p>* Non-diatonic chords are marked with an asterisk.</p>
+        <ul>
+          <li>In a major key, diatonic chords are: I, ii, iii, IV, V, vi, vii°</li>
+          <li>Borrowed chords (like bVII, bIII, etc.) are marked as non-diatonic</li>
+          <li>Chords that don't match their expected quality (e.g., a minor I or major ii) are non-diatonic</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/chord-analyzer.js"></script>
+  <script src="js/ui-controller.js"></script>
+  <script src="js/chord-examples.js"></script>
+</body>
+</html>
