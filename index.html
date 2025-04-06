@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chord Analyzer</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Chord Analyzer</title>
+  <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <div class="container">
     <h1>AI Chord Progression Analyzer</h1>
-
     <div class="card">
       <form id="chord-form">
-        <input type="text" id="chord-input" placeholder="Enter chords separated by commas (e.g., C, G, Am, F)" autofocus>
+        <input
+          type="text"
+          id="chord-input"
+          placeholder="Enter chords separated by commas (e.g., C, G, Am, F)"
+          autofocus
+        />
         <button type="submit" id="analyze-btn">Analyze Chords</button>
       </form>
-
       <div class="examples">
         <h3>Example progressions:</h3>
         <div id="example-buttons">
@@ -42,6 +45,10 @@
         </tbody>
       </table>
 
+      <div class="midi-export">
+        <button id="download-midi" class="midi-btn">Download MIDI</button>
+      </div>
+
       <div class="explanation">
         <p>* Non-diatonic chords are marked with an asterisk.</p>
         <ul>
@@ -54,7 +61,8 @@
   </div>
 
   <script src="js/chord-analyzer.js"></script>
-  <script src="js/ui-controller.js"></script>
   <script src="js/chord-examples.js"></script>
+  <script src="js/jsmidgen.js"></script> <!-- MUST COME BEFORE -->
+  <script src="js/ui-controller.js"></script>
 </body>
 </html>
