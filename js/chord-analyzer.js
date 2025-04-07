@@ -199,6 +199,7 @@ function keyHasInvalidBorrowedChords(chords, key) {
 
 // Look for any rotation pair: a pair (A, B) with A major, B minor, and semitoneDiff(A,B)==4.
 // For each such pair, candidate key = getScaleDegree(A.root, 7).
+// Modified to return candidates and counts as well.
 function getRotationCandidate(chords) {
   const candidateCounts = {};
   for (let i = 0; i < chords.length; i++) {
@@ -225,7 +226,11 @@ function getRotationCandidate(chords) {
       bestCandidate = cand;
     }
   }
-  return bestCandidate;
+  return {
+    candidateCounts,
+    bestCandidate,
+    bestCount
+  };
 }
 
 // Detect IV-V pattern of two major chords 2 semitones apart
@@ -388,34 +393,18 @@ function getScaleDegree(root, semitones, scale) {
 
 /* Key Detection */
 
-// This function first checks for pattern-based candidates, then falls back to scoring.
+// This function now computes a unified score that includes both diatonic scoring
+// and pattern-based bonuses before determining the best key
 function detectKey(chords) {
   if (!chords || chords.length === 0) return null;
 
-  // Check for VI* pattern first - highest priority for handling cases like A, F, C and C, Ab, Eb
-  const viPattern = detectVIPattern(chords);
-  if (viPattern) {
-    return viPattern;
-  }
-
-  // Check for IV-V pattern (two major chords a whole step apart)
-  const ivvCandidate = detectIVVPattern(chords);
-  if (ivvCandidate) {
-    return ivvCandidate;
-  }
-
-  // Try to find a rotation candidate
-  const rotationCandidate = getRotationCandidate(chords);
-  if (rotationCandidate && !keyHasInvalidBorrowedChords(chords, rotationCandidate)) {
-    return PREFERRED_KEY_SPELLING[rotationCandidate] || rotationCandidate;
-  }
-
-  // Otherwise, use scoring
+  // Calculate base diatonic scores for all candidate keys
   const candidateScores = {};
   for (const candidate in majorScales) {
     candidateScores[candidate] = 0;
   }
 
+  // Compute base diatonic score for each candidate
   for (const candidate in majorScales) {
     // Skip keys that would lead to invalid chord analyses
     if (keyHasInvalidBorrowedChords(chords, candidate)) {
@@ -487,6 +476,64 @@ function detectKey(chords) {
     }
 
     candidateScores[candidate] = score;
+  }
+
+  // Check for VI* pattern first - gives high probability for specific patterns
+  const viPattern = detectVIPattern(chords);
+  if (viPattern) {
+    // Increase score for this candidate but don't immediately return
+    candidateScores[viPattern] += 10; // Strong bonus
+  }
+
+  // Check for IV-V pattern (two major chords a whole step apart)
+  const ivvCandidate = detectIVVPattern(chords);
+  if (ivvCandidate) {
+    // Increase score for this candidate but don't immediately return
+    candidateScores[ivvCandidate] += 8; // Strong bonus
+  }
+
+  // Get rotation candidate info without immediately returning a key
+  const rotationInfo = getRotationCandidate(chords);
+
+  // Add rotation candidate bonuses - weight them but don't let them dominate
+  // unless they're significantly stronger than the diatonic score
+  if (rotationInfo.bestCandidate) {
+    const ROTATION_WEIGHT = 2;
+    const ROTATION_MARGIN_THRESHOLD = 2; // Minimum margin to consider the rotation significant
+
+    // Apply bonus for rotation candidates proportional to their count
+    for (const candidate in rotationInfo.candidateCounts) {
+      candidateScores[candidate] += rotationInfo.candidateCounts[candidate] * ROTATION_WEIGHT;
+    }
+
+    // Check if the rotation candidate is significantly stronger
+    if (rotationInfo.bestCount >= ROTATION_MARGIN_THRESHOLD) {
+      candidateScores[rotationInfo.bestCandidate] += ROTATION_WEIGHT;
+    }
+  }
+
+  // Generalized special case for vi-I-IV pattern in any key
+  // For each candidate key, check if the progression contains vi (minor), I (major), and IV (major)
+  for (const candidate in candidateScores) {
+    const scale = majorScales[candidate];
+    if (!scale) continue;
+
+    // Check if progression contains minor vi chord (submediant)
+    const hasMinorvi = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 5 && chord.isMinor);
+
+    // Check if progression contains major I chord (tonic)
+    const hasMajorI = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 0 && !chord.isMinor);
+
+    // Check if progression contains major IV chord (subdominant)
+    const hasMajorIV = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 3 && !chord.isMinor);
+
+    // If all three are present, give a strong bonus to this candidate key
+    if (hasMinorvi && hasMajorI && hasMajorIV) {
+      candidateScores[candidate] += 12; // Strong bonus for vi-I-IV pattern
+    }
   }
 
   // Pick candidate with highest score.
