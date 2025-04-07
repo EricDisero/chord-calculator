@@ -459,13 +459,13 @@ function getRomanNumeral(chord, key) {
   // Check for borrowed flat sixth (bVI)
   const flatVI = getScaleDegree(scale[0], 8);
   if (chord.root === flatVI && !chord.isMinor) {
-    return { numeral: "bVI*", function: "Borrowed Submediant", diatonic: false };
+    return { numeral: "bVI*", function: "Borrowed Chord", diatonic: false };
   }
 
   // Check for borrowed flat seventh (bVII)
   const flatVII = getScaleDegree(scale[0], 10);
   if (chord.root === flatVII && !chord.isMinor) {
-    return { numeral: "bVII*", function: "Borrowed Subtonic", diatonic: false };
+    return { numeral: "bVII*", function: "Borrowed Chord", diatonic: false };
   }
 
   const pos = getPositionInScale(chord.root, scale);
@@ -484,14 +484,39 @@ function getRomanNumeral(chord, key) {
     if (chord.isSeventh) {
       numeral += chord.isMajorSeventh ? 'maj7' : '7';
     }
-    // Mark non-diatonic chords.
+
+    // Mark non-diatonic chords
     if (!diatonic) numeral += '*';
+
+    // Get the standard function name
     let funcName = FUNCTION_NAMES[pos];
-    // (Optional: additional adjustments for secondary dominants, etc. could be added here.)
+
+    // Apply special function names for specific non-diatonic chords
+    if (!diatonic) {
+      // II* should be "V of V"
+      if (pos === 1 && !chord.isMinor) {
+        funcName = "V of V";
+      }
+      // III* should be "Phrygian Dominant"
+      else if (pos === 2 && !chord.isMinor) {
+        funcName = "Phrygian Dominant";
+      }
+      // iv should be "Minor Four"
+      else if (pos === 3 && chord.isMinor) {
+        funcName = "Minor Four";
+      }
+      // VI* should be "Tierce de Picardie"
+      else if (pos === 5 && !chord.isMinor) {
+        funcName = "Tierce de Picardie";
+      }
+    }
+
     return { numeral, function: funcName, diatonic };
   }
+
   // Fallback to a chromatic numeral if chord is not in scale.
-  return { numeral: getChromaticNumeral(chord, key), function: 'Chromatic', diatonic: false };
+  const chromatic = getChromaticNumeral(chord, key);
+  return { numeral: chromatic.numeral, function: chromatic.function, diatonic: false };
 }
 
 /* Chromatic Numeral */
@@ -500,10 +525,15 @@ function getRomanNumeral(chord, key) {
 function getChromaticNumeral(chord, key) {
   const tonicIndex = NOTES.findIndex(n => n.split('/').includes(key));
   const chordIndex = NOTES.findIndex(n => n.split('/').includes(chord.root));
-  if (tonicIndex === -1 || chordIndex === -1) return '?';
+  if (tonicIndex === -1 || chordIndex === -1) return { numeral: '?', function: 'Unknown' };
+
   const semitones = (chordIndex - tonicIndex + 12) % 12;
   const chromaticIntervals = ['I', 'bII', 'II', 'bIII', 'III', 'IV', 'bV', 'V', 'bVI', 'VI', 'bVII', 'VII'];
   let numeral = chromaticIntervals[semitones];
+
+  // Determine function name
+  let functionName = "Borrowed Chord";
+
   if (chord.isMinor) {
     numeral = numeral.toLowerCase();
   } else if (chord.isDiminished) {
@@ -511,10 +541,12 @@ function getChromaticNumeral(chord, key) {
   } else if (chord.isAugmented) {
     numeral += '+';
   }
+
   if (chord.isSeventh) {
     numeral += chord.isMajorSeventh ? 'maj7' : '7';
   }
-  return numeral + '*';
+
+  return { numeral: numeral + '*', function: functionName };
 }
 
 /* Main Analysis Function */
