@@ -204,11 +204,8 @@ function detectIVVPattern(chords) {
   // Need at least 2 major chords
   if (majorChords.length < 2) return null;
 
-  // Special case for Eb and F, which should be interpreted as IV-V in Bb
-  if (majorChords.some(chord => getPositionInScale(chord.root, ['Eb']) === 0) &&
-      majorChords.some(chord => getPositionInScale(chord.root, ['F']) === 0)) {
-    return 'Bb';
-  }
+  // REMOVED SPECIAL CASE FOR Eb-F
+  // No more special-casing for Eb-F pair
 
   // Check all pairs of major chords
   for (let i = 0; i < majorChords.length; i++) {
