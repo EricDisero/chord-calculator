@@ -488,8 +488,13 @@ function detectKey(chords) {
   // Check for IV-V pattern (two major chords a whole step apart)
   const ivvCandidate = detectIVVPattern(chords);
   if (ivvCandidate) {
-    // Increase score for this candidate but don't immediately return
-    candidateScores[ivvCandidate] += 8; // Strong bonus
+    // Check if the tonic of this candidate key is present
+    const tonicPresent = chords.some(chord =>
+      getPositionInScale(chord.root, majorScales[ivvCandidate]) === 0 && !chord.isMinor);
+
+    // Apply lower bonus if tonic is missing
+    const bonus = tonicPresent ? 8 : 4;
+    candidateScores[ivvCandidate] += bonus;
   }
 
   // Get rotation candidate info without immediately returning a key
@@ -533,6 +538,33 @@ function detectKey(chords) {
     // If all three are present, give a strong bonus to this candidate key
     if (hasMinorvi && hasMajorI && hasMajorIV) {
       candidateScores[candidate] += 12; // Strong bonus for vi-I-IV pattern
+    }
+  }
+
+  // Add a bonus for VI*-IV-II* pattern when tonic is absent (for progressions like A, F, D)
+  for (const candidate in candidateScores) {
+    const scale = majorScales[candidate];
+    if (!scale) continue;
+
+    // Check if progression contains major VI* chord (should be minor diatonically)
+    const hasMajorVI = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 5 && !chord.isMinor);
+
+    // Check if progression contains major IV chord
+    const hasMajorIV = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 3 && !chord.isMinor);
+
+    // Check if progression contains major II* chord (should be minor diatonically)
+    const hasMajorII = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 1 && !chord.isMinor);
+
+    // Check if the tonic (I) is missing
+    const hasMissingI = !chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 0 && !chord.isMinor);
+
+    // If we have VI* and IV and either II* or minor ii, and tonic is missing, give bonus
+    if (hasMajorVI && hasMajorIV && hasMissingI) {
+      candidateScores[candidate] += 10; // Strong bonus for VI*-IV-II* pattern
     }
   }
 
