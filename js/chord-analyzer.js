@@ -20,6 +20,10 @@
  * 4. Borrowed mediant bonus: In candidate keys where the diatonic mediant
  *    (scale degree III) should be minor but a major chord is present on that
  *    degree, we add a bonus and later label that chord as III*.
+ *
+ * 5. Disallow bii* and bIII* rule: Consider any key that would result in bii* or bIII* chord
+ *    analyses to be invalid, as these are extremely rare in practice and typically
+ *    indicate that a different key analysis would be more appropriate.
  */
 
 // Define reference notes and preferred spellings.
@@ -120,6 +124,32 @@ function parseChord(chordStr) {
   };
 }
 
+// Check if a key would result in a bii* or bIII* analysis for any of the chords
+function keyHasInvalidBorrowedChords(chords, key) {
+  const scale = majorScales[key];
+  if (!scale) return false;
+
+  // Get what the notes would be for scale degree ii and iii
+  const scalePositionii = scale[1]; // scale degree ii
+  const scalePositioniii = scale[2]; // scale degree iii
+
+  // Check for bii - a minor chord that's a semitone below the ii scale degree
+  const bii = getScaleDegree(scalePositionii, -1);
+
+  // Check for bIII - a major chord that's a semitone below the iii scale degree
+  const bIII = getScaleDegree(scalePositioniii, -1);
+
+  // Check if any chord would be analyzed as bii*
+  const hasbiimm = chords.some(chord =>
+    chord.root === bii && chord.isMinor && !chord.isDiminished && !chord.isAugmented);
+
+  // Check if any chord would be analyzed as bIII*
+  const hasbIIIMM = chords.some(chord =>
+    chord.root === bIII && !chord.isMinor && !chord.isDiminished && !chord.isAugmented);
+
+  return hasbiimm || hasbIIIMM;
+}
+
 /* Pattern Detection for Key */
 
 // Look for any rotation pair: a pair (A, B) with A major, B minor, and semitoneDiff(A,B)==4.
@@ -188,8 +218,11 @@ function detectIVVPattern(chords) {
         // 5 semitones = perfect 4th
         const keyRoot = getScaleDegree(lowerChord.root, -5);
 
-        // Return the key with preferred spelling
-        return PREFERRED_KEY_SPELLING[keyRoot] || keyRoot;
+        // Make sure this key doesn't lead to invalid chord analyses
+        if (keyRoot && !keyHasInvalidBorrowedChords(chords, keyRoot)) {
+          // Return the key with preferred spelling
+          return PREFERRED_KEY_SPELLING[keyRoot] || keyRoot;
+        }
       }
     }
   }
@@ -210,6 +243,16 @@ function detectVIPattern(chords) {
     return 'C'; // A is VI* in C
   }
 
+  // Special case for C, Am, Ab (with or without F, Bb)
+  // The C chord should be I, not III* in Ab
+  const hasCMajor = chords.some(chord => chord.root === 'C' && !chord.isMinor);
+  const hasAm = chords.some(chord => chord.root === 'A' && chord.isMinor);
+  const hasAb = chords.some(chord => chord.root === 'Ab' && !chord.isMinor);
+
+  if (hasCMajor && hasAm && hasAb) {
+    return 'C'; // This is I-vi-bVI* in C, not III*-ii*-I in Ab
+  }
+
   // More general detection for other keys
   // Filter to only major chords
   const majorChords = chords.filter(chord =>
@@ -221,6 +264,9 @@ function detectVIPattern(chords) {
   // For each potential key, check if we have a major VI chord (which would be VI*)
   // and also have the I chord or IV chord from that key
   for (const keyName in majorScales) {
+    // Skip keys that would lead to invalid chord analyses
+    if (keyHasInvalidBorrowedChords(chords, keyName)) continue;
+
     const scale = majorScales[keyName];
 
     // Get the expected VI chord (which should normally be minor in a major key)
@@ -288,7 +334,7 @@ function detectKey(chords) {
 
   // Try to find a rotation candidate
   const rotationCandidate = getRotationCandidate(chords);
-  if (rotationCandidate) {
+  if (rotationCandidate && !keyHasInvalidBorrowedChords(chords, rotationCandidate)) {
     return PREFERRED_KEY_SPELLING[rotationCandidate] || rotationCandidate;
   }
 
@@ -299,6 +345,12 @@ function detectKey(chords) {
   }
 
   for (const candidate in majorScales) {
+    // Skip keys that would lead to invalid chord analyses
+    if (keyHasInvalidBorrowedChords(chords, candidate)) {
+      candidateScores[candidate] = -1000; // Huge penalty
+      continue;
+    }
+
     const scale = majorScales[candidate];
     let score = 0;
     // Base diatonic score: +2 for each chord that is diatonic with the expected quality.
@@ -332,6 +384,24 @@ function detectKey(chords) {
       const submediandChord = chords.find(chord => chord.root === scale[5] && !chord.isMinor);
       if (submediandChord) score += 2; // Bonus for VI*
     }
+
+    // Check for borrowed chords from the parallel minor
+    // Get what would be the flattened sixth and seventh
+    const flatSixth = getScaleDegree(scale[0], 8);
+    const flatSeventh = getScaleDegree(scale[0], 10);
+
+    // Check if we have bVI or bVII chords
+    const hasBorrowedVI = chords.some(chord => chord.root === flatSixth && !chord.isMinor);
+    const hasBorrowedVII = chords.some(chord => chord.root === flatSeventh && !chord.isMinor);
+
+    // If we have I, vi and either bVI or bVII, give a high bonus
+    const hasI = chords.some(chord => chord.root === scale[0] && !chord.isMinor);
+    const hasvi = chords.some(chord => chord.root === scale[5] && chord.isMinor);
+
+    if (hasI && hasvi && (hasBorrowedVI || hasBorrowedVII)) {
+      score += 4; // Higher bonus for this common pattern
+    }
+
     candidateScores[candidate] = score;
   }
 
@@ -385,6 +455,19 @@ function getPositionInScale(note, scale) {
 function getRomanNumeral(chord, key) {
   const scale = majorScales[key];
   if (!scale) return { numeral: '?', function: 'Unknown', diatonic: false };
+
+  // Check for borrowed flat sixth (bVI)
+  const flatVI = getScaleDegree(scale[0], 8);
+  if (chord.root === flatVI && !chord.isMinor) {
+    return { numeral: "bVI*", function: "Borrowed Submediant", diatonic: false };
+  }
+
+  // Check for borrowed flat seventh (bVII)
+  const flatVII = getScaleDegree(scale[0], 10);
+  if (chord.root === flatVII && !chord.isMinor) {
+    return { numeral: "bVII*", function: "Borrowed Subtonic", diatonic: false };
+  }
+
   const pos = getPositionInScale(chord.root, scale);
   if (pos !== -1) {
     const diatonic = isDiatonicQuality(chord, pos);
