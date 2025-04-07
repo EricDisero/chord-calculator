@@ -1,14 +1,18 @@
 /**
  * Chord Analyzer – Pattern‐Enhanced Version
  *
- * This version uses two “pattern” rules:
+ * This version uses three "pattern" rules:
  *
  * 1. Rotation candidate: If there exists any pair of chords
  *    (A major, B minor) whose roots differ by exactly 4 semitones,
  *    then we assume A is functioning as the IV. In that case the key
  *    is set to getScaleDegree(A, 7) (i.e. a perfect 5th up from A).
  *
- * 2. Borrowed mediant bonus: In candidate keys where the diatonic mediant
+ * 2. IV-V pattern: If there exist two major chords whose roots differ by exactly
+ *    2 semitones (whole step), then assume they are IV-V in a key that is a perfect
+ *    4th below the lower chord. This handles progressions like "Eb, F, C" correctly.
+ *
+ * 3. Borrowed mediant bonus: In candidate keys where the diatonic mediant
  *    (scale degree III) should be minor but a major chord is present on that
  *    degree, we add a bonus and later label that chord as III*.
  *
@@ -147,13 +151,53 @@ function getRotationCandidate(chords) {
   return bestCandidate;
 }
 
+// NEW FUNCTION: Detect IV-V pattern of two major chords 2 semitones apart
+// If found, the key is a perfect 4th below the lower chord
+function detectIVVPattern(chords) {
+  // Get only major chords
+  const majorChords = chords.filter(chord =>
+    !chord.isMinor && !chord.isDiminished && !chord.isAugmented
+  );
+
+  // Need at least 2 major chords
+  if (majorChords.length < 2) return null;
+
+  // Check all pairs of major chords
+  for (let i = 0; i < majorChords.length; i++) {
+    for (let j = i + 1; j < majorChords.length; j++) {
+      const chord1 = majorChords[i];
+      const chord2 = majorChords[j];
+
+      // Calculate semitone difference
+      const diff = semitoneDiff(chord1.root, chord2.root);
+
+      // If chords are 2 semitones apart (whole step)
+      if (diff === 2 || diff === 10) {
+        // Determine which is the lower chord
+        const lowerChord = diff === 2 ? chord1 : chord2;
+
+        // The key is a perfect 4th below the lower chord (which would be IV in that key)
+        // 5 semitones = perfect 4th
+        const keyRoot = getScaleDegree(lowerChord.root, -5);
+
+        // Return the key with preferred spelling
+        return PREFERRED_KEY_SPELLING[keyRoot] || keyRoot;
+      }
+    }
+  }
+
+  return null;
+}
+
 /* getScaleDegree: returns the note that is 'semitones' above the given root.
    Uses an order-insensitive lookup over our NOTES groups.
 */
 function getScaleDegree(root, semitones, scale) {
   const noteIndex = getNoteIndex(root);
   if (noteIndex === -1) return null;
-  const resultNote = NOTES[(noteIndex + semitones) % 12].split('/')[0];
+  // Allow negative semitones for perfect 4th below calculation
+  const adjustedSemitones = (semitones + 12) % 12;
+  const resultNote = NOTES[(noteIndex + adjustedSemitones) % 12].split('/')[0];
   if (scale) {
     const enharmonicEquivalents = {
       'C#': 'Db', 'Db': 'C#',
@@ -170,14 +214,17 @@ function getScaleDegree(root, semitones, scale) {
 
 /* Key Detection */
 
-// This function first checks for a rotation candidate from a pattern pair.
-// If none is found, it computes a base diatonic score for each candidate key,
-// then adds a bonus if the candidate key has a “borrowed mediant” (i.e. if
-// the chord on scale degree III is major instead of the diatonic minor).
+// This function first checks for pattern-based candidates, then falls back to scoring.
 function detectKey(chords) {
   if (!chords || chords.length === 0) return null;
 
-  // First, try to find a rotation candidate.
+  // First, check for IV-V pattern (two major chords a whole step apart)
+  const ivvCandidate = detectIVVPattern(chords);
+  if (ivvCandidate) {
+    return ivvCandidate;
+  }
+
+  // Next, try to find a rotation candidate.
   const rotationCandidate = getRotationCandidate(chords);
   if (rotationCandidate) {
     return PREFERRED_KEY_SPELLING[rotationCandidate] || rotationCandidate;

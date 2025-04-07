@@ -1,67 +1,57 @@
 /**
  * Example chord progressions for the Chord Analyzer
- * These will appear as preset buttons in the UI
+ * These examples are based on popular songs, all transposed to C
  */
 
 window.ChordExamples = [
   {
-    name: "C: I-V-vi-IV",
-    chords: "C, G, Am, F",
+    name: "Jon Bellion - All Time Low (C)",
+    chords: "F, G, Am, C",
     expectedKey: "C"
   },
   {
-    name: "G: I-IV-V",
-    chords: "G, C, D",
-    expectedKey: "G"
-  },
-  {
-    name: "Am: i-VI-VII",
-    chords: "Am, F, G",
-    expectedKey: "Am"
-  },
-  {
-    name: "B: IV-vi-V-II",
-    chords: "E, G#m, F#, C#",
-    expectedKey: "B"
-  },
-  {
-    name: "Bb: IV-vi-V-II",
-    chords: "Eb, Gm, F, C",
-    expectedKey: "Bb"
-  },
-  {
-    name: "Eb: IV-vi-I-ii",
-    chords: "Ab, Cm, Eb, Fm",
-    expectedKey: "Eb"
-  },
-  {
-    name: "C with bVII",
-    chords: "C, F, Am, G, Bb, C",
-    expectedKey: "C"
-  },
-  {
-    name: "Chromatic Descent",
-    chords: "C, B, Bb, A, Ab, G",
-    expectedKey: "C"
-  },
-  {
-    name: "D Dorian",
-    chords: "Dm, G, Am, C, F",
-    expectedKey: "C"
-  },
-  {
-    name: "Blues in E",
-    chords: "E, E7, A, A7, B7",
+    name: "Radiohead - Everything In Its Right Place (Ab)",
+    chords: "C, Db, Eb",
     expectedKey: "E"
   },
   {
-    name: "Secondary Dominants",
-    chords: "C, E7, Am, D7, G, C",
+    name: "London Grammar - Hey Now (C)",
+    chords: "F, Am, G, D",
     expectedKey: "C"
   },
   {
-    name: "Jazz ii-V-I",
-    chords: "Dm7, G7, Cmaj7",
+    name: "Deadmau5 - I Remember (C)",
+    chords: "Am, C, Em, G",
     expectedKey: "C"
-  }
+  },
+  {
+    name: "Avicii - Levels (C)",
+    chords: "Am, C, F",
+    expectedKey: "C"
+  },
+  {
+    name: "Boards of Canada - Olson (C)",
+    chords: "F, G, D",
+    expectedKey: "C"
+  },
+  {
+    name: "Above & Beyond - Sun & Moon (C)",
+    chords: "Am, C, Am, F",
+    expectedKey: "C"
+  },
+  {
+    name: "Koven & Circadian - The Outlines (C)",
+    chords: "Em, F, G",
+    expectedKey: "C"
+  },
+  {
+    name: "Charli XCX - Von Dutch (C)",
+    chords: "Am, C, G, Am, D",
+    expectedKey: "C"
+  },
+  {
+    name: "Skeler - ID 1 (C)",
+    chords: "Dm, Em, F",
+    expectedKey: "C"
+  },
 ];
