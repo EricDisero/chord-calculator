@@ -124,7 +124,7 @@ function parseChord(chordStr) {
   };
 }
 
-// Check if a key would result in a bii*, bIII*, or bv* analysis for any of the chords
+// Check if a key would result in bii*, bIII*, bv* analysis, VI* with borrowed chords, or bVII* with v*
 function keyHasInvalidBorrowedChords(chords, key) {
   const scale = majorScales[key];
   if (!scale) return false;
@@ -133,11 +133,16 @@ function keyHasInvalidBorrowedChords(chords, key) {
   const scalePositionii = scale[1]; // scale degree ii
   const scalePositioniii = scale[2]; // scale degree iii
   const scalePositionv = scale[4]; // scale degree v
+  const scalePositionvi = scale[5]; // scale degree vi
 
   // Calculate bii, bIII, and bv
   const bii = getScaleDegree(scalePositionii, -1);
   const bIII = getScaleDegree(scalePositioniii, -1);
   const bv = getScaleDegree(scalePositionv, -1);
+
+  // Calculate bVI and bVII (borrowed from parallel minor)
+  const bVI = getScaleDegree(scale[0], 8); // Flat 6th scale degree
+  const bVII = getScaleDegree(scale[0], 10); // Flat 7th scale degree
 
   // Check if any chord would be analyzed as bii*
   const hasbiimm = chords.some(chord => {
@@ -157,7 +162,37 @@ function keyHasInvalidBorrowedChords(chords, key) {
     return rootIndex === 0 && chord.isMinor && !chord.isDiminished && !chord.isAugmented;
   });
 
-  return hasbiimm || hasbIIIMM || hasbvmm;
+  // Check if any chord would be analyzed as v* (non-diatonic minor dominant)
+  const hasv_star = chords.some(chord => {
+    const rootIndex = getPositionInScale(chord.root, scale);
+    return rootIndex === 4 && chord.isMinor && !chord.isDiminished && !chord.isAugmented;
+  });
+
+  // Check if we have both a major VI* and borrowed bVI* or bVII* in the same progression
+  // This is an unlikely combination and suggests we're in the wrong key
+  const hasVI_star = chords.some(chord => {
+    const rootIndex = getPositionInScale(chord.root, scale);
+    return rootIndex === 5 && !chord.isMinor && !chord.isDiminished && !chord.isAugmented;
+  });
+
+  const hasbVI_star = chords.some(chord => {
+    const rootIndex = getPositionInScale(chord.root, [bVI]);
+    return rootIndex === 0 && !chord.isMinor && !chord.isDiminished && !chord.isAugmented;
+  });
+
+  const hasbVII_star = chords.some(chord => {
+    const rootIndex = getPositionInScale(chord.root, [bVII]);
+    return rootIndex === 0 && !chord.isMinor && !chord.isDiminished && !chord.isAugmented;
+  });
+
+  // Check for invalid combinations:
+  // 1. VI* with either bVI* or bVII*
+  const hasVIWithBorrowed = hasVI_star && (hasbVI_star || hasbVII_star);
+
+  // 2. bVII* with v* (new rule)
+  const hasbVIIWithv = hasbVII_star && hasv_star;
+
+  return hasbiimm || hasbIIIMM || hasbvmm || hasVIWithBorrowed || hasbVIIWithv;
 }
 
 /* Pattern Detection for Key */
