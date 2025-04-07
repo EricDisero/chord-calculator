@@ -21,7 +21,7 @@
  *    (scale degree III) should be minor but a major chord is present on that
  *    degree, we add a bonus and later label that chord as III*.
  *
- * 5. Disallow bii* and bIII* rule: Consider any key that would result in bii* or bIII* chord
+ * 5. Disallow bii*, bIII*, and bv* rule: Consider any key that would result in these chord
  *    analyses to be invalid, as these are extremely rare in practice and typically
  *    indicate that a different key analysis would be more appropriate.
  */
@@ -124,30 +124,40 @@ function parseChord(chordStr) {
   };
 }
 
-// Check if a key would result in a bii* or bIII* analysis for any of the chords
+// Check if a key would result in a bii*, bIII*, or bv* analysis for any of the chords
 function keyHasInvalidBorrowedChords(chords, key) {
   const scale = majorScales[key];
   if (!scale) return false;
 
-  // Get what the notes would be for scale degree ii and iii
+  // Get notes for scale degrees ii, iii, and v
   const scalePositionii = scale[1]; // scale degree ii
   const scalePositioniii = scale[2]; // scale degree iii
+  const scalePositionv = scale[4]; // scale degree v
 
-  // Check for bii - a minor chord that's a semitone below the ii scale degree
+  // Calculate bii, bIII, and bv
   const bii = getScaleDegree(scalePositionii, -1);
-
-  // Check for bIII - a major chord that's a semitone below the iii scale degree
   const bIII = getScaleDegree(scalePositioniii, -1);
+  const bv = getScaleDegree(scalePositionv, -1);
 
   // Check if any chord would be analyzed as bii*
-  const hasbiimm = chords.some(chord =>
-    chord.root === bii && chord.isMinor && !chord.isDiminished && !chord.isAugmented);
+  const hasbiimm = chords.some(chord => {
+    const rootIndex = getPositionInScale(chord.root, [bii]);
+    return rootIndex === 0 && chord.isMinor && !chord.isDiminished && !chord.isAugmented;
+  });
 
   // Check if any chord would be analyzed as bIII*
-  const hasbIIIMM = chords.some(chord =>
-    chord.root === bIII && !chord.isMinor && !chord.isDiminished && !chord.isAugmented);
+  const hasbIIIMM = chords.some(chord => {
+    const rootIndex = getPositionInScale(chord.root, [bIII]);
+    return rootIndex === 0 && !chord.isMinor && !chord.isDiminished && !chord.isAugmented;
+  });
 
-  return hasbiimm || hasbIIIMM;
+  // Check if any chord would be analyzed as bv*
+  const hasbvmm = chords.some(chord => {
+    const rootIndex = getPositionInScale(chord.root, [bv]);
+    return rootIndex === 0 && chord.isMinor && !chord.isDiminished && !chord.isAugmented;
+  });
+
+  return hasbiimm || hasbIIIMM || hasbvmm;
 }
 
 /* Pattern Detection for Key */
@@ -195,8 +205,8 @@ function detectIVVPattern(chords) {
   if (majorChords.length < 2) return null;
 
   // Special case for Eb and F, which should be interpreted as IV-V in Bb
-  if (majorChords.some(chord => chord.root === 'Eb') &&
-      majorChords.some(chord => chord.root === 'F')) {
+  if (majorChords.some(chord => getPositionInScale(chord.root, ['Eb']) === 0) &&
+      majorChords.some(chord => getPositionInScale(chord.root, ['F']) === 0)) {
     return 'Bb';
   }
 
@@ -230,58 +240,89 @@ function detectIVVPattern(chords) {
   return null;
 }
 
-// Detect the VI* pattern - where a major chord would be VI in a key
-// This specifically targets progressions like A, C, F where A should be VI* in C
+// Enhanced detection of VI* pattern to work with all keys, properly handling enharmonic equivalents
 function detectVIPattern(chords) {
-  // Check for the specific A, C, F pattern (and variations like A, C, F, G or A, C, F, D)
-  // which should be interpreted as VI*, I, IV in C (and possibly V or II)
-  const hasA = chords.some(chord => chord.root === 'A' && !chord.isMinor);
-  const hasC = chords.some(chord => chord.root === 'C' && !chord.isMinor);
-  const hasF = chords.some(chord => chord.root === 'F' && !chord.isMinor);
-
-  if (hasA && hasC && hasF) {
-    return 'C'; // A is VI* in C
-  }
-
-  // Special case for C, Am, Ab (with or without F, Bb)
-  // The C chord should be I, not III* in Ab
-  const hasCMajor = chords.some(chord => chord.root === 'C' && !chord.isMinor);
-  const hasAm = chords.some(chord => chord.root === 'A' && chord.isMinor);
-  const hasAb = chords.some(chord => chord.root === 'Ab' && !chord.isMinor);
-
-  if (hasCMajor && hasAm && hasAb) {
-    return 'C'; // This is I-vi-bVI* in C, not III*-ii*-I in Ab
-  }
-
-  // More general detection for other keys
-  // Filter to only major chords
+  // Get only the major chords
   const majorChords = chords.filter(chord =>
     !chord.isMinor && !chord.isDiminished && !chord.isAugmented
   );
 
+  // Need at least 2 major chords for this pattern
   if (majorChords.length < 2) return null;
 
-  // For each potential key, check if we have a major VI chord (which would be VI*)
-  // and also have the I chord or IV chord from that key
+  // Special case patterns - explicit checks for common VI* patterns
+  // These are useful fallbacks and help with debugging
+
+  // Special case for F, Ab, Db - should be VI*, I, IV in Ab
+  const hasF = majorChords.some(chord => getPositionInScale(chord.root, ['F']) === 0);
+  const hasAb = majorChords.some(chord => getPositionInScale(chord.root, ['Ab']) === 0);
+  const hasDb = majorChords.some(chord => getPositionInScale(chord.root, ['Db']) === 0);
+
+  if (hasF && hasAb && hasDb) {
+    return 'Ab';
+  }
+
+  // Special case for D, F, Bb - should be VI*, I, IV in F
+  const hasD = majorChords.some(chord => getPositionInScale(chord.root, ['D']) === 0);
+  const hasBb = majorChords.some(chord => getPositionInScale(chord.root, ['Bb']) === 0);
+
+  if (hasD && hasF && hasBb) {
+    return 'F';
+  }
+
+  // Special case for A, C, F - should be VI*, I, IV in C
+  const hasA = majorChords.some(chord => getPositionInScale(chord.root, ['A']) === 0);
+  const hasC = majorChords.some(chord => getPositionInScale(chord.root, ['C']) === 0);
+
+  if (hasA && hasC && hasF) {
+    return 'C';
+  }
+
+  // Special case for C, Eb, Ab - should be VI*, I, IV in Eb
+  const hasEb = majorChords.some(chord => getPositionInScale(chord.root, ['Eb']) === 0);
+
+  if (hasC && hasEb && hasAb) {
+    return 'Eb';
+  }
+
+  // Special case for G, Bb, Eb - should be VI*, I, IV in Bb
+  const hasG = majorChords.some(chord => getPositionInScale(chord.root, ['G']) === 0);
+
+  if (hasG && hasBb && hasEb) {
+    return 'Bb';
+  }
+
+  // Special case for E, G, C - should be VI*, I, IV in G
+  const hasE = majorChords.some(chord => getPositionInScale(chord.root, ['E']) === 0);
+
+  if (hasE && hasG && hasC) {
+    return 'G';
+  }
+
+  // Check every possible key using proper enharmonic handling
   for (const keyName in majorScales) {
+    const scale = majorScales[keyName];
+
     // Skip keys that would lead to invalid chord analyses
     if (keyHasInvalidBorrowedChords(chords, keyName)) continue;
 
-    const scale = majorScales[keyName];
-
-    // Get the expected VI chord (which should normally be minor in a major key)
-    const sixthDegree = scale[5];
-
-    // Check if we have a major chord on this degree
-    const hasMajorSixth = majorChords.some(chord => chord.root === sixthDegree);
+    // Check if we have a major chord on the 6th scale degree (which would be VI*)
+    // Using getPositionInScale for proper enharmonic handling
+    const hasMajorSixth = majorChords.some(chord => getPositionInScale(chord.root, scale) === 5);
 
     if (hasMajorSixth) {
-      // Check if we have I and/or IV from this key
-      const hasOne = majorChords.some(chord => chord.root === scale[0]);
-      const hasFour = majorChords.some(chord => chord.root === scale[3]);
+      // Check if we have I and/or IV from this key, which would strongly support this key choice
+      const hasOne = majorChords.some(chord => getPositionInScale(chord.root, scale) === 0);
+      const hasFour = majorChords.some(chord => getPositionInScale(chord.root, scale) === 3);
+      const hasFive = majorChords.some(chord => getPositionInScale(chord.root, scale) === 4);
 
-      // If we have both I and IV, this is very likely the key
-      if (hasOne && hasFour) {
+      // If we have the tonic and either subdominant or dominant, this is likely the key
+      if (hasOne && (hasFour || hasFive)) {
+        return PREFERRED_KEY_SPELLING[keyName] || keyName;
+      }
+
+      // If we have VI* and both IV and V, this is also likely the key
+      if (hasFour && hasFive) {
         return PREFERRED_KEY_SPELLING[keyName] || keyName;
       }
     }
@@ -319,8 +360,7 @@ function getScaleDegree(root, semitones, scale) {
 function detectKey(chords) {
   if (!chords || chords.length === 0) return null;
 
-  // Check for specific A, C, F pattern and variants first
-  // This takes highest precedence to fix the issue
+  // Check for VI* pattern first - highest priority for handling cases like A, F, C and C, Ab, Eb
   const viPattern = detectVIPattern(chords);
   if (viPattern) {
     return viPattern;
@@ -353,6 +393,7 @@ function detectKey(chords) {
 
     const scale = majorScales[candidate];
     let score = 0;
+
     // Base diatonic score: +2 for each chord that is diatonic with the expected quality.
     chords.forEach(chord => {
       const pos = getPositionInScale(chord.root, scale);
@@ -360,28 +401,35 @@ function detectKey(chords) {
         score += 2;
       }
     });
+
     // Bonus: if the tonic (scale degree 0) is present (as a major chord), add +1.
     if (chords.some(chord => getPositionInScale(chord.root, scale) === 0 && !chord.isMinor)) {
       score += 1;
     }
+
     // Bonus for subdominant (scale degree 3 or IV), add +1
     if (chords.some(chord => getPositionInScale(chord.root, scale) === 3 && !chord.isMinor)) {
       score += 1;
     }
+
     // Bonus for dominant (scale degree 4 or V), add +1
     if (chords.some(chord => getPositionInScale(chord.root, scale) === 4 && !chord.isMinor)) {
       score += 1;
     }
+
     // Borrowed mediant bonus:
     // In a major scale, the expected mediant (scale[2]) should be minor.
     // If a major chord appears on that degree, add bonus +3.
     if (scale[2]) {
-      const mediantChord = chords.find(chord => chord.root === scale[2] && !chord.isMinor);
+      const mediantChord = chords.find(chord =>
+        getPositionInScale(chord.root, scale) === 2 && !chord.isMinor);
       if (mediantChord) score += 3;
     }
+
     // Check for VI* pattern (major chord on scale degree 5 which should be minor)
     if (scale[5]) {
-      const submediandChord = chords.find(chord => chord.root === scale[5] && !chord.isMinor);
+      const submediandChord = chords.find(chord =>
+        getPositionInScale(chord.root, scale) === 5 && !chord.isMinor);
       if (submediandChord) score += 2; // Bonus for VI*
     }
 
@@ -391,12 +439,16 @@ function detectKey(chords) {
     const flatSeventh = getScaleDegree(scale[0], 10);
 
     // Check if we have bVI or bVII chords
-    const hasBorrowedVI = chords.some(chord => chord.root === flatSixth && !chord.isMinor);
-    const hasBorrowedVII = chords.some(chord => chord.root === flatSeventh && !chord.isMinor);
+    const hasBorrowedVI = chords.some(chord =>
+      getPositionInScale(chord.root, [flatSixth]) === 0 && !chord.isMinor);
+    const hasBorrowedVII = chords.some(chord =>
+      getPositionInScale(chord.root, [flatSeventh]) === 0 && !chord.isMinor);
 
     // If we have I, vi and either bVI or bVII, give a high bonus
-    const hasI = chords.some(chord => chord.root === scale[0] && !chord.isMinor);
-    const hasvi = chords.some(chord => chord.root === scale[5] && chord.isMinor);
+    const hasI = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 0 && !chord.isMinor);
+    const hasvi = chords.some(chord =>
+      getPositionInScale(chord.root, scale) === 5 && chord.isMinor);
 
     if (hasI && hasvi && (hasBorrowedVI || hasBorrowedVII)) {
       score += 4; // Higher bonus for this common pattern
@@ -413,6 +465,26 @@ function detectKey(chords) {
       bestCandidate = candidate;
     }
   }
+
+  // Safety check: if the best candidate key would result in invalid analyses, try picking another key
+  if (bestCandidate && keyHasInvalidBorrowedChords(chords, bestCandidate)) {
+    // Find the next best candidate that doesn't have invalid borrowed chords
+    let nextBestCandidate = null, nextBestScore = -Infinity;
+
+    for (const candidate in candidateScores) {
+      if (candidateScores[candidate] > nextBestScore &&
+          candidate !== bestCandidate &&
+          !keyHasInvalidBorrowedChords(chords, candidate)) {
+        nextBestScore = candidateScores[candidate];
+        nextBestCandidate = candidate;
+      }
+    }
+
+    if (nextBestCandidate) {
+      bestCandidate = nextBestCandidate;
+    }
+  }
+
   return bestCandidate ? (PREFERRED_KEY_SPELLING[bestCandidate] || bestCandidate) : null;
 }
 
@@ -458,13 +530,13 @@ function getRomanNumeral(chord, key) {
 
   // Check for borrowed flat sixth (bVI)
   const flatVI = getScaleDegree(scale[0], 8);
-  if (chord.root === flatVI && !chord.isMinor) {
+  if (getPositionInScale(chord.root, [flatVI]) === 0 && !chord.isMinor) {
     return { numeral: "bVI*", function: "Borrowed Chord", diatonic: false };
   }
 
   // Check for borrowed flat seventh (bVII)
   const flatVII = getScaleDegree(scale[0], 10);
-  if (chord.root === flatVII && !chord.isMinor) {
+  if (getPositionInScale(chord.root, [flatVII]) === 0 && !chord.isMinor) {
     return { numeral: "bVII*", function: "Borrowed Chord", diatonic: false };
   }
 
@@ -523,8 +595,8 @@ function getRomanNumeral(chord, key) {
 
 // For chords that are not diatonic, generate a chromatic numeral based on semitone distance.
 function getChromaticNumeral(chord, key) {
-  const tonicIndex = NOTES.findIndex(n => n.split('/').includes(key));
-  const chordIndex = NOTES.findIndex(n => n.split('/').includes(chord.root));
+  const tonicIndex = getNoteIndex(key);
+  const chordIndex = getNoteIndex(chord.root);
   if (tonicIndex === -1 || chordIndex === -1) return { numeral: '?', function: 'Unknown' };
 
   const semitones = (chordIndex - tonicIndex + 12) % 12;
