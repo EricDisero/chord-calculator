@@ -150,12 +150,6 @@ function keyHasInvalidBorrowedChords(chords, key) {
     return rootIndex === 0 && chord.isMinor && !chord.isDiminished && !chord.isAugmented;
   });
 
-  // Check if any chord would be analyzed as bIII*
-  const hasbIIIMM = chords.some(chord => {
-    const rootIndex = getPositionInScale(chord.root, [bIII]);
-    return rootIndex === 0 && !chord.isMinor && !chord.isDiminished && !chord.isAugmented;
-  });
-
   // Check if any chord would be analyzed as bv*
   const hasbvmm = chords.some(chord => {
     const rootIndex = getPositionInScale(chord.root, [bv]);
@@ -192,7 +186,7 @@ function keyHasInvalidBorrowedChords(chords, key) {
   // 2. bVII* with v* (new rule)
   const hasbVIIWithv = hasbVII_star && hasv_star;
 
-  return hasbiimm || hasbIIIMM || hasbvmm || hasVIWithBorrowed || hasbVIIWithv;
+  return hasbiimm || hasbvmm || hasVIWithBorrowed || hasbVIIWithv;
 }
 
 /* Pattern Detection for Key */
